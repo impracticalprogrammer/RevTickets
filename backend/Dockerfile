@@ -16,8 +16,13 @@ RUN pip install --no-cache-dir -r requirements.txt
 # Copy application code
 COPY . .
 
-# Make start script executable
-RUN chmod +x start.sh
+# Fix line endings (convert Windows CRLF to Unix LF) and make start script executable
+RUN if [ -f start.sh ]; then \
+        sed -i 's/\r$//' start.sh && \
+        chmod +x start.sh; \
+    else \
+        echo "ERROR: start.sh not found!" && exit 1; \
+    fi
 
 # Expose the port FastAPI runs on
 EXPOSE 8000

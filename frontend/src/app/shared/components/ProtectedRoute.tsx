@@ -14,13 +14,20 @@ export function ProtectedRoute({ children, requiredRole }: ProtectedRouteProps) 
   const { isAuthenticated, isLoading, user } = useAuth();
   const router = useRouter();
 
+  console.log('[ProtectedRoute] isAuthenticated:', isAuthenticated, 'isLoading:', isLoading, 'user:', user?.email);
+
   useEffect(() => {
+    console.log('[ProtectedRoute useEffect] isAuthenticated:', isAuthenticated, 'isLoading:', isLoading);
+    // Only redirect if we're definitely not authenticated and not loading
     if (!isLoading && !isAuthenticated) {
+      console.log('[ProtectedRoute] Redirecting to login');
       router.push('/auth/login');
     }
   }, [isLoading, isAuthenticated, router]);
 
+  // Show loading while checking authentication
   if (isLoading) {
+    console.log('[ProtectedRoute] Showing loading spinner');
     return (
       <div className="min-h-screen flex items-center justify-center">
         <LoadingSpinner text="Loading..." />
@@ -28,12 +35,15 @@ export function ProtectedRoute({ children, requiredRole }: ProtectedRouteProps) 
     );
   }
 
+  // If not authenticated, don't render (will redirect)
   if (!isAuthenticated) {
-    return null; // Will redirect to login
+    console.log('[ProtectedRoute] Not authenticated, returning null');
+    return null;
   }
 
   // Check role-based access
   if (requiredRole && user?.role !== requiredRole) {
+    console.log('[ProtectedRoute] Access denied - wrong role');
     return (
       <div className="min-h-screen flex items-center justify-center">
         <div className="text-center">
@@ -48,5 +58,6 @@ export function ProtectedRoute({ children, requiredRole }: ProtectedRouteProps) 
     );
   }
 
+  console.log('[ProtectedRoute] Rendering protected content');
   return <>{children}</>;
 }

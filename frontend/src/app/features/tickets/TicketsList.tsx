@@ -127,6 +127,21 @@ export function TicketsList() {
     applyFiltersAndSorting();
   }, [allTickets, searchQuery, sortField, sortDirection, currentPage, applyFiltersAndSorting]);
 
+  // Listen for category updates and refetch tickets
+  useEffect(() => {
+    const handleCategoryUpdate = () => {
+      console.log('[TicketsList] Category updated, refetching tickets...');
+      fetchTickets();
+    };
+
+    if (typeof window !== 'undefined') {
+      window.addEventListener('categoryUpdated', handleCategoryUpdate);
+      return () => {
+        window.removeEventListener('categoryUpdated', handleCategoryUpdate);
+      };
+    }
+  }, [fetchTickets]);
+
   const handleSearch = () => {
     setCurrentPage(1); // Reset to first page when searching
     applyFiltersAndSorting();

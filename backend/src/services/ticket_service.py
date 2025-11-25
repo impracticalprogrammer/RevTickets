@@ -17,17 +17,40 @@ from fastapi import HTTPException
 class TicketService:
     @staticmethod
     async def _build_ticket_response(ticket: Ticket) -> TicketResponse:
-        # Handle linked objects - they might be Link objects (need fetch) or actual objects (already fetched)
-        if hasattr(ticket.category_id, 'fetch'):
-            category = await ticket.category_id.fetch() if ticket.category_id else None
-        else:
-            category = ticket.category_id
+        # Always fetch linked objects fresh from the database to ensure we have the latest data
+        # This is critical for category/subcategory names that may have been updated
+        
+        # Get category ID and fetch fresh from database
+        if ticket.category_id:
+            if hasattr(ticket.category_id, 'ref') and ticket.category_id.ref:
+                # It's a Link, get the ID from ref
+                category_id = ticket.category_id.ref.id
+            elif hasattr(ticket.category_id, 'id'):
+                # It's an object, get the ID directly
+                category_id = ticket.category_id.id
+            else:
+                category_id = None
             
-        if hasattr(ticket.sub_category_id, 'fetch'):
-            subcategory = await ticket.sub_category_id.fetch() if ticket.sub_category_id else None
+            category = await Category.get(category_id) if category_id else None
+            if category:
+                print(f"[TicketService] Fetched category for ticket {ticket.id}: '{category.name}' (ID: {category.id})")
         else:
-            subcategory = ticket.sub_category_id
+            category = None
+        
+        # Get subcategory ID and fetch fresh from database
+        if ticket.sub_category_id:
+            if hasattr(ticket.sub_category_id, 'ref') and ticket.sub_category_id.ref:
+                subcategory_id = ticket.sub_category_id.ref.id
+            elif hasattr(ticket.sub_category_id, 'id'):
+                subcategory_id = ticket.sub_category_id.id
+            else:
+                subcategory_id = None
             
+            subcategory = await SubCategory.get(subcategory_id) if subcategory_id else None
+        else:
+            subcategory = None
+        
+        # For user and agent, we can use the existing logic since those don't get updated as frequently
         if hasattr(ticket.user_id, 'fetch'):
             user = await ticket.user_id.fetch() if ticket.user_id else None
         else:

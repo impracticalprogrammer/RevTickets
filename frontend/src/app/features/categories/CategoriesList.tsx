@@ -144,13 +144,22 @@ export function CategoriesList() {
       let categoryId: string;
       
       if (editingCategory) {
-        // BUG: Update API call not being made despite form submission appearing successful
-        // This causes category edit form to appear to save but changes aren't persisted to database
-        // await categoriesApi.update(editingCategory.id, {
-        //   name: formData.name.trim(),
-        //   description: formData.description.trim(),
-        // });
+        // Update existing category
+        await categoriesApi.update(editingCategory.id, {
+          name: formData.name.trim(),
+          description: formData.description.trim(),
+        });
         categoryId = editingCategory.id;
+        
+        // Force a small delay to ensure backend processes the update
+        await new Promise(resolve => setTimeout(resolve, 500));
+        
+        // Trigger a custom event to notify other components (like TicketsList) to refresh
+        if (typeof window !== 'undefined') {
+          window.dispatchEvent(new CustomEvent('categoryUpdated', { 
+            detail: { categoryId: editingCategory.id } 
+          }));
+        }
       } else {
         // Create new category
         const newCategory = await categoriesApi.create({

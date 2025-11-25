@@ -29,9 +29,12 @@ async def get_category(category_id: str):
 
 @router.put("/{category_id}", response_model=CategoryResponse)
 async def update_category(category_id: str, category: CategoryUpdate):
+    print(f"PUT /categories/{category_id} - Updating category: {category_id} with data: {category.model_dump(exclude_unset=True)}")
     updated = await CategoryService.update_category(category_id, category)
     if not updated:
+        print(f"PUT /categories/{category_id} - Category not found")
         raise HTTPException(status_code=404, detail="Category not found")
+    print(f"PUT /categories/{category_id} - Successfully updated category: {updated.name}")
     return updated
 
 @router.delete("/{category_id}")

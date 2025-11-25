@@ -150,6 +150,16 @@ export function CategoriesList() {
           description: formData.description.trim(),
         });
         categoryId = editingCategory.id;
+        
+        // Force a small delay to ensure backend processes the update
+        await new Promise(resolve => setTimeout(resolve, 500));
+        
+        // Trigger a custom event to notify other components (like TicketsList) to refresh
+        if (typeof window !== 'undefined') {
+          window.dispatchEvent(new CustomEvent('categoryUpdated', { 
+            detail: { categoryId: editingCategory.id } 
+          }));
+        }
       } else {
         // Create new category
         const newCategory = await categoriesApi.create({

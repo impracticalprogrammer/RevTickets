@@ -27,15 +27,78 @@ class CategoryService:
 
     @staticmethod
     async def update_category(category_id: str, category_data: CategoryUpdate) -> Optional[CategoryResponse]:
+        from src.models.ticket import Ticket
+        from datetime import datetime, timezone
+        
         category = await Category.get(category_id)
         if category is None:
             return None
+        
+        # Log the old name before update
+        old_name = category.name
+        print(f"[CategoryService] Updating category {category_id}: '{old_name}' -> '{category_data.name}'")
+        
+        # Check if name is being updated
+        name_changed = category_data.name is not None and category_data.name != category.name
+        
         data = category_data.dict(exclude_unset=True)
 
         for k, v in data.items():
             setattr(category, k, v)
 
         category = await category.save()
+        
+        # Verify the save worked
+        print(f"[CategoryService] Category saved. New name in memory: '{category.name}'")
+        
+        # Double-check by re-fetching from database
+        verification = await Category.get(category_id)
+        if verification:
+            print(f"[CategoryService] Verification: Category name in DB is now: '{verification.name}'")
+        
+        # If category name changed, update updated_at timestamp on all tickets with this category
+        if name_changed:
+            try:
+                from beanie import PydanticObjectId
+                object_id = PydanticObjectId(category_id)
+                print(f"[CategoryService] Looking for tickets with category_id: {object_id}")
+                
+                # Fetch all tickets and filter manually - this is more reliable with Beanie Links
+                all_tickets = await Ticket.find_all().to_list()
+                print(f"[CategoryService] Total tickets in database: {len(all_tickets)}")
+                
+                tickets = []
+                for t in all_tickets:
+                    if t.category_id:
+                        # Check if it's a Link object
+                        if hasattr(t.category_id, 'ref') and t.category_id.ref:
+                            ticket_cat_id = str(t.category_id.ref.id)
+                            print(f"[CategoryService] Ticket {t.id} has category_id (Link): {ticket_cat_id}")
+                            if ticket_cat_id == category_id:
+                                tickets.append(t)
+                                print(f"[CategoryService] ✓ Match! Ticket {t.id} belongs to category {category_id}")
+                        else:
+                            # It's already a Category object
+                            ticket_cat_id = str(t.category_id.id)
+                            print(f"[CategoryService] Ticket {t.id} has category_id (Object): {ticket_cat_id}")
+                            if ticket_cat_id == category_id:
+                                tickets.append(t)
+                                print(f"[CategoryService] ✓ Match! Ticket {t.id} belongs to category {category_id}")
+                
+                print(f"[CategoryService] Found {len(tickets)} tickets matching category {category_id}")
+                
+                # Update updated_at timestamp to ensure tickets reflect the new category name
+                for ticket in tickets:
+                    ticket.updated_at = datetime.now(timezone.utc)
+                    await ticket.save()
+                    print(f"[CategoryService] Updated ticket {ticket.id} timestamp")
+                
+                print(f"Updated {len(tickets)} tickets to reflect category name change")
+            except Exception as e:
+                print(f"Warning: Failed to update tickets for category {category_id}: {e}")
+                import traceback
+                traceback.print_exc()
+        
         category_dict = category.model_dump()
         category_dict["id"] = str(category.id)
         return CategoryResponse(**category_dict)

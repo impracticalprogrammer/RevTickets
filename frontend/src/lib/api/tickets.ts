@@ -21,11 +21,14 @@ export const ticketsApi = {
     userId?: string;
     agentId?: string;
   }): Promise<Ticket[]> {
-    return apiClient.get(API_ENDPOINTS.TICKETS.BASE, { params });
+    // Add cache-busting timestamp to ensure fresh data
+    const allParams = { ...params, _t: Date.now().toString() };
+    return apiClient.get(API_ENDPOINTS.TICKETS.BASE, { params: allParams });
   },
 
   async getById(id: string): Promise<Ticket> {
-    return apiClient.get(API_ENDPOINTS.TICKETS.BY_ID(id));
+    // Add cache-busting timestamp to ensure fresh data
+    return apiClient.get(`${API_ENDPOINTS.TICKETS.BY_ID(id)}?_t=${Date.now()}`);
   },
 
   async create(ticket: CreateTicket): Promise<Ticket> {

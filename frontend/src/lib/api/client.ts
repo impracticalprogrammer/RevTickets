@@ -28,13 +28,13 @@ class ApiClient {
       (error) => Promise.reject(error)
     );
 
-    // Response interceptor
+    // Response interceptor - just reject, don't auto-logout
+    // Let AuthContext handle 401 errors more gracefully
     this.client.interceptors.response.use(
       (response: AxiosResponse) => response,
       (error) => {
-        if (error.response?.status === 401) {
-          this.handleUnauthorized();
-        }
+        // Don't automatically redirect on 401
+        // Just pass the error through so AuthContext can handle it
         return Promise.reject(error);
       }
     );
@@ -43,12 +43,6 @@ class ApiClient {
   private getAuthToken(): string | null {
     if (typeof window === 'undefined') return null;
     return localStorage.getItem('authToken');
-  }
-
-  private handleUnauthorized(): void {
-    if (typeof window === 'undefined') return;
-    localStorage.removeItem('authToken');
-    window.location.href = '/auth/login';
   }
 
   public async get<T = unknown>(url: string, config?: AxiosRequestConfig): Promise<T> {

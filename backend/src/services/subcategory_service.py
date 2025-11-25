@@ -72,12 +72,19 @@ class SubCategoryService:
 
     @staticmethod
     async def update_subcategory(subcategory_id: str, subcategory_data: SubCategoryUpdate) -> SubCategoryResponse:
+        from src.models.ticket import Ticket
+        from datetime import datetime, timezone
+        
         subcategory = await SubCategory.get(subcategory_id)
         if not subcategory:
             return None
 
+        # Check if name is being updated
+        old_name = subcategory.name
         subcategory.name = subcategory_data.name or subcategory.name
         subcategory.description = subcategory_data.description or subcategory.description
+        name_changed = subcategory_data.name is not None and subcategory_data.name != old_name
+        
         if subcategory_data.category_id:
             category = await Category.get(subcategory_data.category_id)
             if not category:
@@ -85,6 +92,32 @@ class SubCategoryService:
             subcategory.category = category
 
         subcategory = await subcategory.save()
+        
+        # If subcategory name changed, update updated_at timestamp on all tickets with this subcategory
+        if name_changed:
+            try:
+                from beanie import PydanticObjectId
+                object_id = PydanticObjectId(subcategory_id)
+                # Find all tickets that reference this subcategory using the field name (not alias)
+                # Beanie stores Links using the field name 'sub_category_id', not the alias 'subCategoryId'
+                tickets = await Ticket.find({"sub_category_id.$id": object_id}).to_list()
+                # If that doesn't work, try alternative query methods
+                if len(tickets) == 0:
+                    # Try fetching all tickets and filtering manually
+                    all_tickets = await Ticket.find_all().to_list()
+                    tickets = [
+                        t for t in all_tickets 
+                        if t.sub_category_id and hasattr(t.sub_category_id, 'ref') and t.sub_category_id.ref and str(t.sub_category_id.ref.id) == subcategory_id
+                    ]
+                # Update updated_at timestamp to ensure tickets reflect the new subcategory name
+                for ticket in tickets:
+                    ticket.updated_at = datetime.now(timezone.utc)
+                    await ticket.save()
+                print(f"Updated {len(tickets)} tickets to reflect subcategory name change")
+            except Exception as e:
+                print(f"Warning: Failed to update tickets for subcategory {subcategory_id}: {e}")
+                import traceback
+                traceback.print_exc()
         subcategory_dict = subcategory.model_dump()
         subcategory_dict["id"] = str(subcategory.id)
         
